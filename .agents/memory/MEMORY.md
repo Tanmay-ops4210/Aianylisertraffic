@@ -1,0 +1,1 @@
+- [Artifact service working directory](artifact-service-working-directory.md) — root-level Python apps and environments require changing to the workspace root before launch.

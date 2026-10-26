@@ -1,0 +1,160 @@
+Build SidewalkAI — Minimal, Research-Ready Computer Vision App
+
+Build a working, professional computer vision research application called SidewalkAI: AI-Based Sidewalk Accessibility Assessment.
+
+Act as a senior full-stack and computer vision engineer. Implement the application directly in Replit, test it, and prepare it for deployment to Vercel. Do not stop at a plan or mockup.
+
+1. Follow Ponytail coding principles
+
+Apply the Ponytail philosophy throughout this task:
+
+1. Skip features that are not necessary.
+2. Read existing files and reuse working code before adding anything.
+3. Prefer Python's standard library and native browser features.
+4. Reuse already-installed dependencies before adding packages.
+5. Avoid abstractions, wrappers, duplicate utilities, redundant configuration, and unnecessary files.
+6. Write the smallest implementation that correctly solves the problem.
+7. Add focused tests for calculations, branching logic, validation, and security-sensitive behavior.
+
+Keep security, input validation, accessibility, error handling, and correct results intact. Fewer lines must not mean lower quality.
+
+Do not add a database, authentication, state-management library, Docker, multiple model frameworks, or elaborate CI pipelines unless genuinely necessary. Do not repeatedly rewrite working code.
+
+2. Technology stack
+
+- Frontend: React, TypeScript, Vite, Tailwind CSS.
+- Backend: Python 3.12, FastAPI, Pydantic, Pillow and NumPy. Use OpenCV only where it provides necessary image-processing functionality.
+- Charts: Use native UI elements or existing dependencies; add a chart library only if required.
+- Deployment: One Git repository and one Vercel project, using a currently supported Vite + FastAPI deployment configuration.
+- Documentation: FastAPI-generated OpenAPI schema and Swagger UI.
+
+Keep the default Python dependency bundle lightweight. Do not install PyTorch or large local-model packages in the production path.
+
+3. Core functionality
+
+Create a responsive, professional research dashboard with an upload-and-analyze workflow.
+
+Users must be able to upload a sidewalk image, view the original and processed image, inspect analysis results, and export a JSON report.
+
+The system must support three core outputs:
+
+A. Obstacle assessment: Detect visible obstructions such as parked motorcycles, vendor stalls, rubbish, and other relevant objects using a genuinely configured vision model.
+
+B. Walkable-space estimation: Estimate the unobstructed portion of the visible sidewalk using a sidewalk segmentation mask and obstacle masks. Where masks are unavailable, clearly identify the result as unavailable or approximate.
+
+C. Accessibility indicator: Calculate a transparent, preliminary visual walkability score from 0 to 100. Explain the formula in the UI. Never present the score as official accessibility certification or proof that a path is wheelchair-safe.
+
+Keep the UI focused: project heading, image uploader, analysis controls, original/annotated image comparison, result metrics, model status, limitations, and a compact research evaluation section. Use a clean, accessible design with responsive layouts and no decorative features that do not support the workflow.
+
+4. Computer vision behavior
+
+Implement one lightweight baseline and, at most, one optional hosted model integration.
+
+- The baseline may provide OpenCV image processing and heuristic estimates, explicitly labelled as such.
+- When configured, the hosted inference provider must perform actual model inference. Keep API credentials on the backend, using environment variables.
+- Do not generate fabricated object labels, confidence values, segmentation masks, accuracy figures, or model results.
+- If no trained model is configured, explain which outputs are unavailable and allow the baseline or analysis limitations to be inspected.
+- Do not download datasets or model weights during each request.
+
+Intersect obstacle masks with the sidewalk mask before calculating unobstructed space:
+
+"walkable % = 100 × clear sidewalk pixels / valid sidewalk pixels"
+
+Handle missing masks, zero-area masks, overlaps, and invalid images safely. If only bounding boxes are available, identify the calculation as an approximation.
+
+Keep inference modular enough to add a locally trained model later, but do not build an elaborate plugin architecture.
+
+5. Research evaluation
+
+Provide a small, functional evaluation interface or script that compares predictions against ground-truth annotations.
+
+Support:
+
+- Precision, recall and F1 for obstacle detection where suitable labels exist.
+- Mask IoU where segmentation annotations exist.
+- Mean absolute error for estimated unobstructed-space percentages.
+- Processing time.
+
+Calculate only metrics supported by the supplied data. Provide a small documented test fixture for verifying the metric calculations; mark synthetic fixtures clearly and never present their values as research findings.
+
+Document how public sidewalk datasets and a locally collected Indian footpath dataset can be prepared. Prevent leakage between training and test splits.
+
+6. FastAPI and OpenAPI
+
+Export the FastAPI application as "app" from a Vercel-supported entrypoint, preferably root "app.py".
+
+Implement only the essential endpoints:
+
+- "GET /api/health" — service status.
+- "POST /api/analyze" — validated image upload and structured results.
+- Additional evaluation endpoints only if the interface actually requires them.
+
+Use Pydantic response schemas, meaningful HTTP errors, safe image validation, a sensible upload limit, and controlled error messages.
+
+Keep "/docs", "/redoc", and "/openapi.json" available for API documentation.
+
+7. Vercel deployment
+
+Configure a single repository containing the frontend and backend.
+
+Before creating deployment configuration, follow the current official Vercel documentation:
+https://vercel.com/docs/frameworks/backend/fastapi
+
+Use the smallest supported configuration that works. Create "vercel.json" only with necessary, valid settings and the official schema:
+https://openapi.vercel.sh/vercel.json
+
+Create only the required dependency and build files, such as "requirements.txt", "frontend/package.json", "pyproject.toml" if needed, and ".python-version" if needed.
+
+Ensure that:
+
+- Vercel can discover and run the FastAPI application.
+- The React frontend builds successfully.
+- Frontend API calls use relative "/api/..." URLs.
+- API routes are not intercepted by the frontend fallback.
+- Browser routes, static assets, and API documentation work in production.
+- The frontend production build is available to the deployed application.
+- The application does not depend on persistent local storage, a GPU, or large model weights.
+- Secrets are supplied through environment variables, never source code.
+- The Python function stays within Vercel's deployment bundle limits.
+- Local Replit development remains practical.
+
+Do not guess unsupported configuration fields. Validate the chosen setup against current Vercel documentation. If the intended single-project arrangement is incompatible with the supported runtime, select the simplest supported alternative and explain the trade-off rather than shipping a broken configuration.
+
+8. Minimal file structure
+
+Start with a small structure and add files only when needed:
+
+sidewalk-ai/
+├── app.py
+├── requirements.txt
+├── pyproject.toml
+├── vercel.json
+├── README.md
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── src/
+├── tests/
+│   └── test_core.py
+└── .env.example
+
+Use existing Replit project files where possible. Do not create empty modules, placeholder documentation, or multiple files containing the same logic.
+
+9. Validation and completion
+
+Implement the project, then run the available checks:
+
+- Install dependencies and start the application.
+- Build the React frontend.
+- Test the health endpoint and valid/invalid image uploads.
+- Test the accessibility calculation and evaluation metrics.
+- Verify the OpenAPI schema.
+- Check frontend-to-backend routing.
+- Validate the Vercel configuration and build.
+- Fix errors revealed by those checks.
+
+Use one focused test file initially; split it only when the project genuinely requires it.
+
+Keep your final report brief: files created, commands and tests run, actual outcomes, required environment variables, and any remaining deployment blocker. Never claim a deployment or successful model inference that was not actually verified.
+
+Priority: the smallest maintainable implementation that works, gives honest research results, and can be deployed reliably.

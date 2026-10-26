@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: analysis
+    description: Sidewalk image analysis
 paths:
   /healthz:
     get:
@@ -24,6 +26,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /health:
+    get:
+      operationId: sidewalkHealth
+      tags: [health]
+      summary: Check SidewalkAI service status
+      responses:
+        "200":
+          description: Service status and vision model configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SidewalkHealth"
+  /analyze:
+    post:
+      operationId: analyzeSidewalkImage
+      tags: [analysis]
+      summary: Validate and inspect a sidewalk image
+      description: Returns image diagnostics and explicit availability states. No detections or walkability score are reported without a configured trained model.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/SidewalkImageInput"
+      responses:
+        "200":
+          description: Honest image analysis results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          description: Invalid or unsupported image
+        "413":
+          description: Image exceeds upload limit
 components:
   schemas:
     HealthStatus:
@@ -33,4 +70,94 @@ components:
           type: string
       required:
         - status
+    SidewalkHealth:
+      type: object
+      properties:
+        status:
+          type: string
+        model_configured:
+          type: boolean
+        model_name:
+          type: ["string", "null"]
+      required: [status, model_configured, model_name]
+    SidewalkImageInput:
+      type: object
+      properties:
+        image:
+          type: string
+          format: binary
+      required: [image]
+    ImageSummary:
+      type: object
+      properties:
+        filename:
+          type: string
+        content_type:
+          type: string
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        size_bytes:
+          type: integer
+          minimum: 1
+      required: [filename, content_type, width, height, size_bytes]
+    AnalysisResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [complete]
+        image:
+          $ref: "#/components/schemas/ImageSummary"
+        model_configured:
+          type: boolean
+        detections_available:
+          type: boolean
+        detections:
+          type: array
+          items:
+            type: object
+        sidewalk_mask_available:
+          type: boolean
+        obstacle_masks_available:
+          type: boolean
+        walkable_percentage:
+          type: ["number", "null"]
+        accessibility_score:
+          type: ["number", "null"]
+        walkable_estimate_status:
+          type: string
+          enum: [unavailable]
+        processed_image_available:
+          type: boolean
+        processed_preview_base64:
+          type: ["string", "null"]
+          description: Base64-encoded PNG edge preview, not an object or sidewalk segmentation.
+        processing_method:
+          type: string
+        processing_ms:
+          type: number
+        limitations:
+          type: array
+          items:
+            type: string
+      required:
+        - status
+        - image
+        - model_configured
+        - detections_available
+        - detections
+        - sidewalk_mask_available
+        - obstacle_masks_available
+        - walkable_percentage
+        - accessibility_score
+        - walkable_estimate_status
+        - processed_image_available
+        - processed_preview_base64
+        - processing_method
+        - processing_ms
+        - limitations
 

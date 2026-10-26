@@ -1,0 +1,1 @@
+{"synthetic_fixture": true, "prediction": {"obstacles": ["motorcycle"], "walkable_mask": [[1, 1], [0, 1]], "unobstructed_percentage": 75, "processing_ms": 12}, "ground_truth": {"obstacles": ["motorcycle", "rubbish"], "walkable_mask": [[1, 0], [0, 1]], "unobstructed_percentage": 80}}

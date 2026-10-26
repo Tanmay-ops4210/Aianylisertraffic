@@ -1,45 +1,40 @@
-# [Project name]
+# SidewalkAI
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+SidewalkAI is a research dashboard for safely inspecting sidewalk images and reporting which computer-vision outputs are unavailable.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Frontend workflow: `pnpm --filter @workspace/sidewalk-ai run dev`
+- API workflow runs FastAPI from the repository root on port 8061.
+- Frontend typecheck: `pnpm --filter @workspace/sidewalk-ai run typecheck`
+- Frontend production build: `PATH="$PWD/.pythonlibs/bin:$PATH" .pythonlibs/bin/python build.py`
+- Python tests: `PYTHONPATH=. .pythonlibs/bin/python -m pytest -q`
+- Evaluation: `.pythonlibs/bin/python evaluation.py <annotations.jsonl>`
+- No secrets or database are required.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- React, TypeScript, Vite, Tailwind CSS
+- FastAPI, Pydantic, Pillow, NumPy
+- Vercel FastAPI runtime with the Vite build promoted as static frontend assets
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/sidewalk-ai/` — dashboard and its Replit web/API workflows
+- `app.py` — FastAPI app, upload validation, image diagnostics, and OpenAPI docs
+- `evaluation.py` — metrics for supplied prediction/annotation pairs
+- `tests/test_core.py` — calculation, validation, and evaluation tests
+- `README.md` — local usage, evaluation format, dataset preparation, and Vercel setup
+- `lib/api-spec/openapi.yaml` — API contract used to generate the TypeScript client
 
-## Architecture decisions
+## Product limits
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- No trained model is configured. Obstacle detections, segmentation masks, walkable-space percentage, and the accessibility indicator remain unavailable.
+- The processed preview is a grayscale gradient-edge image, not an object-detection or sidewalk-segmentation result.
+- Images are processed in memory, not saved.
+- Synthetic evaluation data is a test fixture only, never a research result.
+- Outputs are not accessibility certification or proof of wheelchair safety.
 
-## Product
+## Deployment
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+Vercel's documented FastAPI frontend integration serves the built Vite assets. `pyproject.toml` configures the Python entrypoint, build command, and static-file exclusion; the root `app.py` is the FastAPI entrypoint. No `vercel.json` overrides are required by this setup.

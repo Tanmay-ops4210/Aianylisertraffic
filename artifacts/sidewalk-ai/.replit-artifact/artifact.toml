@@ -1,0 +1,40 @@
+kind = "web"
+previewPath = "/"
+title = "SidewalkAI"
+description = "A computer vision research dashboard for assessing visible sidewalk obstructions and preliminary walkable space from uploaded images, with transparent limitations and downloadable reports."
+version = "1.0.0"
+id = "artifacts/sidewalk-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24431
+
+[services.development]
+run = "pnpm --filter @workspace/sidewalk-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sidewalk-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/sidewalk-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24431"
+BASE_PATH = "/"
+
+
+[[services]]
+name = "api"
+paths = ["/api/health", "/api/analyze", "/docs", "/redoc", "/openapi.json"]
+localPort = 8061
+
+[services.development]
+run = "cd ../.. && .pythonlibs/bin/uvicorn app:app --host 0.0.0.0 --port $PORT"
+
+[services.env]
+PORT = "8061"
