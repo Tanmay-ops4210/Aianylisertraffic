@@ -17,7 +17,6 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from vision_model import is_model_available, process_video, run_detection
-
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_PREVIEW_EDGE = 1400
