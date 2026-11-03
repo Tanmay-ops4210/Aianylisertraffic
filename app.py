@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
+from vision_model import is_model_available, run_detection
+
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_PREVIEW_EDGE = 1400
@@ -164,7 +166,12 @@ def make_edge_preview(image: Image.Image) -> bytes:
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", model_configured=False, model_name=None)
+    has_model = is_model_available()
+    return HealthResponse(
+        status="ok",
+        model_configured=has_model,
+        model_name="YOLOv8-nano (Sidewalk Obstacles)" if has_model else None,
+    )
 
 
 @app.post("/api/analyze", response_model=AnalysisResponse)
@@ -173,6 +180,34 @@ async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
     data = await image.read(MAX_UPLOAD_BYTES + 1)
     await image.close()
     decoded, summary = decode_image(data, image.filename)
+
+    if is_model_available():
+        detections, preview, walkable_pct, access_score = run_detection(decoded)
+        det_count = len(detections)
+        limitations = [
+            f"Detected {det_count} sidewalk obstacle(s) using YOLOv8-nano."
+            if det_count > 0 else "No major physical obstacles detected on the path.",
+            "Walkable space and accessibility scores are preliminary estimates.",
+            "This preliminary research tool is not accessibility certification or proof of wheelchair safety.",
+        ]
+        return AnalysisResponse(
+            status="complete",
+            image=summary,
+            model_configured=True,
+            detections_available=True,
+            detections=detections,
+            sidewalk_mask_available=False,
+            obstacle_masks_available=det_count > 0,
+            walkable_percentage=walkable_pct,
+            accessibility_score=access_score,
+            walkable_estimate_status="calculated",
+            processed_image_available=True,
+            processed_preview_base64=base64.b64encode(preview).decode("ascii"),
+            processing_method="yolov8n_obstacle_detection",
+            processing_ms=round((time.perf_counter() - started) * 1000, 2),
+            limitations=limitations,
+        )
+
     preview = make_edge_preview(decoded)
     return AnalysisResponse(
         status="complete",
