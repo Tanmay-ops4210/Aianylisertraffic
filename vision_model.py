@@ -28,14 +28,21 @@ _session = None
 
 
 def get_session():
-    """Lazily load the ONNX session once."""
+    """Lazily load the ONNX session once, tuned for low-CPU environments."""
     global _session
     if _session is None and MODEL_PATH.exists():
         try:
             import onnxruntime as ort
             opts = ort.SessionOptions()
-            opts.intra_op_num_threads = 2
-            _session = ort.InferenceSession(str(MODEL_PATH), sess_options=opts)
+            # Render free tier: 0.1 vCPU — keep to 1 thread, no spinning
+            opts.intra_op_num_threads = 1
+            opts.inter_op_num_threads = 1
+            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
+            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            _session = ort.InferenceSession(
+                str(MODEL_PATH), sess_options=opts, providers=["CPUExecutionProvider"]
+            )
         except Exception:
             _session = None
     return _session
@@ -127,7 +134,7 @@ def draw_annotations(image: Image.Image, detections: list[dict[str, Any]]) -> by
         draw.text((x1 + 3, max(0, y1 - 16)), tag, fill="#ffffff")
 
     buf = io.BytesIO()
-    preview.save(buf, format="PNG", optimize=True)
+    preview.save(buf, format="JPEG", quality=80)
     return buf.getvalue()
 
 

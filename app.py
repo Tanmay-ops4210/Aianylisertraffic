@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import time
@@ -175,6 +176,18 @@ def health() -> HealthResponse:
     )
 
 
+@app.get("/api/debug")
+def debug_info():
+    from vision_model import MODEL_PATH
+    import sys
+    return {
+        "model_path": str(MODEL_PATH),
+        "model_exists": MODEL_PATH.exists(),
+        "model_size_bytes": MODEL_PATH.stat().st_size if MODEL_PATH.exists() else None,
+        "python": sys.version,
+    }
+
+
 @app.post("/api/analyze", response_model=AnalysisResponse)
 async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
     started = time.perf_counter()
@@ -193,8 +206,8 @@ async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
             raise HTTPException(status_code=503, detail="Video obstacle detection requires the YOLOv8 model.")
 
         try:
-            detections, preview, walkable_pct, access_score, width, height = process_video(
-                data, image.filename or "video.mp4"
+            detections, preview, walkable_pct, access_score, width, height = await asyncio.to_thread(
+                process_video, data, image.filename or "video.mp4"
             )
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Failed to process video: {exc}")
@@ -234,7 +247,7 @@ async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
     decoded, summary = decode_image(data, image.filename)
 
     if is_model_available():
-        detections, preview, walkable_pct, access_score = run_detection(decoded)
+        detections, preview, walkable_pct, access_score = await asyncio.to_thread(run_detection, decoded)
         det_count = len(detections)
         limitations = [
             f"Detected {det_count} sidewalk obstacle(s) using YOLOv8-nano."
@@ -289,4 +302,4 @@ frontend_dist = Path(__file__).parent / "artifacts" / "sidewalk-ai" / "dist" / "
 if frontend_dist.is_dir():
     # Vercel promotes this build to its static CDN; local Replit development
     # uses Vite and therefore does not need this mount.
-    app.frontend("/", directory=str(frontend_dist), fallback="index.html")
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")

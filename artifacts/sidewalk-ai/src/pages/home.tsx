@@ -357,7 +357,7 @@ export default function Home() {
               processedPreviewUrl={result?.processed_preview_base64
                 ? (file?.type.startsWith('video/')
                     ? `data:image/gif;base64,${result.processed_preview_base64}`
-                    : `data:image/png;base64,${result.processed_preview_base64}`)
+                    : `data:image/jpeg;base64,${result.processed_preview_base64}`)
                 : null}
               result={result}
               isVideo={file?.type.startsWith('video/')}
