@@ -206,9 +206,12 @@ async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
             raise HTTPException(status_code=503, detail="Video obstacle detection requires the YOLOv8 model.")
 
         try:
-            detections, preview, walkable_pct, access_score, width, height = await asyncio.to_thread(
-                process_video, data, image.filename or "video.mp4"
+            detections, preview, walkable_pct, access_score, width, height = await asyncio.wait_for(
+                asyncio.to_thread(process_video, data, image.filename or "video.mp4"),
+                timeout=110.0,  # Render free tier: stay under 120s request timeout
             )
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="Video processing timed out. Try a shorter video (< 30s).")
         except Exception as exc:
             raise HTTPException(status_code=400, detail=f"Failed to process video: {exc}")
 

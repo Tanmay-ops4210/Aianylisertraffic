@@ -141,13 +141,14 @@ def draw_annotations(image: Image.Image, detections: list[dict[str, Any]]) -> by
 def run_detection(
     image: Image.Image,
     conf_threshold: float = 0.30,
+    input_size: int = 416,
 ) -> tuple[list[dict[str, Any]], bytes, float, float]:
     """Run YOLOv8 inference, return detections, annotated preview, walkable %, and score."""
     session = get_session()
     if session is None:
         raise RuntimeError("YOLOv8 model is not loaded.")
 
-    tensor, scale, pad_x, pad_y = letterbox(image, 640)
+    tensor, scale, pad_x, pad_y = letterbox(image, input_size)
     input_name = session.get_inputs()[0].name
     output = session.run(None, {input_name: tensor})[0]
 
@@ -209,7 +210,7 @@ def run_detection(
 def process_video(
     video_bytes: bytes,
     filename: str,
-    max_frames: int = 15,
+    max_frames: int = 5,
 ) -> tuple[list[dict[str, Any]], bytes, float, float, int, int]:
     """Sample video frames, run YOLOv8 detection, generate animated GIF preview and aggregated stats."""
     import os
@@ -231,21 +232,21 @@ def process_video(
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
 
-        # Sample frames evenly across the video
-        interval = max(1, int(fps * 0.5))
-        frame_indices = list(range(0, total_frames, interval))
-        if len(frame_indices) > max_frames:
-            step = len(frame_indices) / max_frames
-            frame_indices = [frame_indices[int(i * step)] for i in range(max_frames)]
+        # Pick evenly spaced frame indices (max 5 for Render free tier speed)
+        if total_frames <= max_frames:
+            frame_indices = list(range(total_frames))
+        else:
+            step = total_frames / max_frames
+            frame_indices = [int(i * step) for i in range(max_frames)]
 
         sampled_annotated: list[Image.Image] = []
         all_detections: list[dict[str, Any]] = []
         walkable_scores: list[float] = []
         access_scores: list[float] = []
 
-        curr_frame_idx = 0
         target_set = set(frame_indices)
         max_target = max(frame_indices) if frame_indices else 0
+        curr_frame_idx = 0
 
         while cap.isOpened() and curr_frame_idx <= max_target:
             ret, frame = cap.read()
@@ -254,9 +255,11 @@ def process_video(
             if curr_frame_idx in target_set:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 pil_frame = Image.fromarray(rgb)
+                # Shrink frame to 320px for fast inference on low-CPU
+                pil_frame.thumbnail((320, 320))
                 time_sec = round(curr_frame_idx / fps, 1)
 
-                dets, _, w_pct, a_score = run_detection(pil_frame)
+                dets, _, w_pct, a_score = run_detection(pil_frame, conf_threshold=0.30)
                 walkable_scores.append(w_pct)
                 access_scores.append(a_score)
 
@@ -267,7 +270,7 @@ def process_video(
 
                 annotated_bytes = draw_annotations(pil_frame, dets)
                 annotated_img = Image.open(io.BytesIO(annotated_bytes)).convert("RGB")
-                annotated_img.thumbnail((540, 540))
+                annotated_img.thumbnail((400, 400))
                 sampled_annotated.append(annotated_img)
 
             curr_frame_idx += 1
@@ -284,9 +287,8 @@ def process_video(
                 format="GIF",
                 save_all=True,
                 append_images=sampled_annotated[1:],
-                duration=400,
+                duration=500,
                 loop=0,
-                optimize=True,
             )
             preview_bytes = gif_buf.getvalue()
         else:
