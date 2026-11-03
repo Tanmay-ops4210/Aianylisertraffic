@@ -15,12 +15,13 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
-from vision_model import is_model_available, run_detection
+from vision_model import is_model_available, process_video, run_detection
 
-MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_PREVIEW_EDGE = 1400
 SUPPORTED_FORMATS = {"JPEG", "PNG", "WEBP"}
+SUPPORTED_VIDEO_EXTS = {".mp4", ".webm", ".mov", ".avi", ".mkv"}
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 app = FastAPI(
@@ -179,6 +180,57 @@ async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
     started = time.perf_counter()
     data = await image.read(MAX_UPLOAD_BYTES + 1)
     await image.close()
+    if not data:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds the 25 MiB upload limit.")
+
+    ext = Path(image.filename or "").suffix.lower()
+    is_video = ext in SUPPORTED_VIDEO_EXTS or (image.content_type or "").startswith("video/")
+
+    if is_video:
+        if not is_model_available():
+            raise HTTPException(status_code=503, detail="Video obstacle detection requires the YOLOv8 model.")
+
+        try:
+            detections, preview, walkable_pct, access_score, width, height = process_video(
+                data, image.filename or "video.mp4"
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to process video: {exc}")
+
+        summary = ImageSummary(
+            filename=safe_filename(image.filename),
+            content_type=image.content_type or "video/mp4",
+            width=width,
+            height=height,
+            size_bytes=len(data),
+        )
+        det_count = len(detections)
+        limitations = [
+            f"Analyzed route video using YOLOv8-nano ({det_count} obstacle events detected).",
+            "Animated preview displays detected obstacles sampled along the video route.",
+            "Walkable space and accessibility scores are route-averaged estimates.",
+            "This preliminary research tool is not accessibility certification or proof of wheelchair safety.",
+        ]
+        return AnalysisResponse(
+            status="complete",
+            image=summary,
+            model_configured=True,
+            detections_available=True,
+            detections=detections,
+            sidewalk_mask_available=False,
+            obstacle_masks_available=det_count > 0,
+            walkable_percentage=walkable_pct,
+            accessibility_score=access_score,
+            walkable_estimate_status="calculated",
+            processed_image_available=True,
+            processed_preview_base64=base64.b64encode(preview).decode("ascii"),
+            processing_method="yolov8n_video_obstacle_detection",
+            processing_ms=round((time.perf_counter() - started) * 1000, 2),
+            limitations=limitations,
+        )
+
     decoded, summary = decode_image(data, image.filename)
 
     if is_model_available():

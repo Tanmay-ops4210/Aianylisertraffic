@@ -17,8 +17,15 @@ import {
 import { getSidewalkHealthQueryKey, useAnalyzeSidewalkImage, useSidewalkHealth } from '@workspace/api-client-react';
 import type { AnalysisResult } from '@workspace/api-client-react';
 
-const MAX_FILE_SIZE = 8 * 1024 * 1024;
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const ACCEPTED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+];
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -27,7 +34,7 @@ function formatBytes(bytes: number) {
 
 function formatError(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
-  return 'The image could not be analyzed. Please try again.';
+  return 'The file could not be analyzed. Please try again.';
 }
 
 function StatusSkeleton() {
@@ -46,44 +53,50 @@ function ResultImage({
   previewUrl,
   processedPreviewUrl,
   result,
+  isVideo,
 }: {
   previewUrl: string | null;
   processedPreviewUrl: string | null;
   result: AnalysisResult | null;
+  isVideo?: boolean;
 }) {
   return (
-    <div className="result-grid" aria-label="Image availability comparison">
-      <section className="panel image-card" aria-label="Original image">
+    <div className="result-grid" aria-label="Media availability comparison">
+      <section className="panel image-card" aria-label="Original media">
         <div className="image-head">
-          <span className="image-label">01 / Original image</span>
+          <span className="image-label">{isVideo ? '01 / Original video' : '01 / Original image'}</span>
           <span className="image-state">{previewUrl ? 'Source available' : 'Awaiting upload'}</span>
         </div>
         <div className="image-stage">
           {previewUrl ? (
-            <img src={previewUrl} alt="Original uploaded sidewalk scene" data-testid="img-original-preview" />
+            isVideo ? (
+              <video src={previewUrl} controls autoPlay muted loop playsInline style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 4 }} />
+            ) : (
+              <img src={previewUrl} alt="Original uploaded sidewalk scene" data-testid="img-original-preview" />
+            )
           ) : (
             <div className="image-empty">
               <span className="unavailable-mark"><ImageIcon size={19} strokeWidth={1.5} /></span>
-              <span>Original image appears here</span>
+              <span>Original media appears here</span>
             </div>
           )}
         </div>
       </section>
-      <section className="panel image-card" aria-label="Processed image availability">
+      <section className="panel image-card" aria-label="Processed result availability">
         <div className="image-head">
-          <span className="image-label">02 / Processed result</span>
+          <span className="image-label">{isVideo ? '02 / Route scan (Animated)' : '02 / Processed result'}</span>
           <span className="image-state">{result?.processed_image_available ? 'Available' : 'Not available'}</span>
         </div>
         <div className="image-stage">
           {processedPreviewUrl ? (
             <figure className="processed-figure">
-              <img src={processedPreviewUrl} alt="Grayscale gradient edge preview; not an obstacle detection or sidewalk segmentation" data-testid="img-processed-preview" />
-              <figcaption>Grayscale edge preview · not a segmentation mask</figcaption>
+              <img src={processedPreviewUrl} alt="Obstacle detection output" data-testid="img-processed-preview" />
+              <figcaption>{isVideo ? 'Animated route detection · sampled frames' : 'Processed preview · obstacle detections'}</figcaption>
             </figure>
           ) : (
             <div className="image-empty">
               <span className="unavailable-mark"><ScanLine size={19} strokeWidth={1.5} /></span>
-              <span>{result?.processed_image_available ? 'Processed preview is unavailable in this response.' : 'Run inspection to create a baseline edge preview'}</span>
+              <span>{result?.processed_image_available ? 'Processed preview is unavailable in this response.' : 'Run inspection to detect sidewalk obstacles'}</span>
             </div>
           )}
         </div>
@@ -173,15 +186,15 @@ export default function Home() {
     setValidationError('');
     if (!candidate) return;
     if (!ACCEPTED_TYPES.includes(candidate.type)) {
-      setValidationError('Choose a JPG, PNG, or WebP image. Other formats are not supported.');
+      setValidationError('Choose a JPG, PNG, WebP image or MP4, WebM video.');
       return;
     }
     if (candidate.size > MAX_FILE_SIZE) {
-      setValidationError('This image is larger than 15 MB. Choose a smaller file.');
+      setValidationError('This file is larger than 25 MB. Choose a smaller file.');
       return;
     }
     if (candidate.size === 0) {
-      setValidationError('This file is empty. Choose a valid image.');
+      setValidationError('This file is empty. Choose a valid image or video.');
       return;
     }
     setFile(candidate);
@@ -264,16 +277,16 @@ export default function Home() {
                 }}
               >
                 <div className="upload-icon"><Upload size={20} strokeWidth={1.7} /></div>
-                <div className="drop-title">Drop a sidewalk image to begin</div>
-                <div className="drop-sub">Or browse your device for a source image</div>
+                <div className="drop-title">Drop a sidewalk image or video to begin</div>
+                <div className="drop-sub">Or browse your device for a source image or video</div>
                 <button className="choose-button" type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }} data-testid="button-browse-image">
-                  Choose image
+                  Choose file
                 </button>
                 <input
                   ref={inputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  aria-label="Choose image file"
+                  accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+                  aria-label="Choose media file"
                   data-testid="input-image-file"
                   hidden
                   onChange={(event) => {
@@ -288,21 +301,21 @@ export default function Home() {
                   <div className="file-tile"><FileImage size={17} /></div>
                   <div className="file-detail">
                     <div className="file-name">{file.name}</div>
-                    <div className="file-size">{formatBytes(file.size)} · {file.type.replace('image/', '').toUpperCase()}</div>
+                    <div className="file-size">{formatBytes(file.size)} · {file.type.replace(/(image|video)\//, '').toUpperCase()}</div>
                   </div>
-                  <button className="icon-button" type="button" aria-label="Remove selected image" data-testid="button-remove-image" onClick={() => { setFile(null); setResult(null); analyzeMutation.reset(); }}>
+                  <button className="icon-button" type="button" aria-label="Remove selected file" data-testid="button-remove-image" onClick={() => { setFile(null); setResult(null); analyzeMutation.reset(); }}>
                     <X size={17} />
                   </button>
                 </div>
               )}
-              <div className="file-limits"><span>JPG · PNG · WEBP</span><span>Maximum file size 8 MB</span></div>
+              <div className="file-limits"><span>JPG · PNG · WEBP · MP4 · WEBM</span><span>Maximum file size 25 MB</span></div>
               {validationError && <div className="message message-error" role="alert" data-testid="error-validation">{validationError}</div>}
               {analyzeMutation.isError && <div className="message message-error" role="alert" data-testid="error-analysis">{formatError(analyzeMutation.error)}</div>}
               {healthQuery.isError && <div className="message message-error" role="status" data-testid="error-health">
                 Could not read service status. <button type="button" className="icon-button" style={{ display: 'inline-grid', width: 'auto', height: 'auto', padding: '0 3px', textDecoration: 'underline' }} onClick={() => healthQuery.refetch()}>Retry</button>
               </div>}
               <button className="primary-button" type="button" disabled={!file || analyzeMutation.isPending} onClick={doAnalyze} data-testid="button-analyze">
-                {analyzeMutation.isPending ? <><span className="spinner" aria-hidden="true" /> Inspecting source…</> : <><MousePointer2 size={15} /> Inspect image</>}
+                {analyzeMutation.isPending ? <><span className="spinner" aria-hidden="true" /> Inspecting source…</> : <><MousePointer2 size={15} /> {file?.type.startsWith('video/') ? 'Inspect video' : 'Inspect image'}</>}
               </button>
             </div>
           </div>
@@ -342,9 +355,12 @@ export default function Home() {
             <ResultImage
               previewUrl={previewUrl}
               processedPreviewUrl={result?.processed_preview_base64
-                ? `data:image/png;base64,${result.processed_preview_base64}`
+                ? (file?.type.startsWith('video/')
+                    ? `data:image/gif;base64,${result.processed_preview_base64}`
+                    : `data:image/png;base64,${result.processed_preview_base64}`)
                 : null}
               result={result}
+              isVideo={file?.type.startsWith('video/')}
             />
           )}
 

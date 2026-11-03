@@ -197,3 +197,100 @@ def run_detection(
 
     preview_bytes = draw_annotations(image, detections)
     return detections, preview_bytes, walkable_percentage, accessibility_score
+
+
+def process_video(
+    video_bytes: bytes,
+    filename: str,
+    max_frames: int = 15,
+) -> tuple[list[dict[str, Any]], bytes, float, float, int, int]:
+    """Sample video frames, run YOLOv8 detection, generate animated GIF preview and aggregated stats."""
+    import os
+    import tempfile
+    import cv2
+
+    ext = Path(filename).suffix.lower() or ".mp4"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+        tmp.write(video_bytes)
+        tmp_path = tmp.name
+
+    try:
+        cap = cv2.VideoCapture(tmp_path)
+        if not cap.isOpened():
+            raise ValueError("Could not decode the uploaded video.")
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
+
+        # Sample frames evenly across the video
+        interval = max(1, int(fps * 0.5))
+        frame_indices = list(range(0, total_frames, interval))
+        if len(frame_indices) > max_frames:
+            step = len(frame_indices) / max_frames
+            frame_indices = [frame_indices[int(i * step)] for i in range(max_frames)]
+
+        sampled_annotated: list[Image.Image] = []
+        all_detections: list[dict[str, Any]] = []
+        walkable_scores: list[float] = []
+        access_scores: list[float] = []
+
+        curr_frame_idx = 0
+        target_set = set(frame_indices)
+        max_target = max(frame_indices) if frame_indices else 0
+
+        while cap.isOpened() and curr_frame_idx <= max_target:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if curr_frame_idx in target_set:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                pil_frame = Image.fromarray(rgb)
+                time_sec = round(curr_frame_idx / fps, 1)
+
+                dets, _, w_pct, a_score = run_detection(pil_frame)
+                walkable_scores.append(w_pct)
+                access_scores.append(a_score)
+
+                for d in dets:
+                    d_copy = dict(d)
+                    d_copy["timestamp_sec"] = time_sec
+                    all_detections.append(d_copy)
+
+                annotated_bytes = draw_annotations(pil_frame, dets)
+                annotated_img = Image.open(io.BytesIO(annotated_bytes)).convert("RGB")
+                annotated_img.thumbnail((540, 540))
+                sampled_annotated.append(annotated_img)
+
+            curr_frame_idx += 1
+
+        cap.release()
+
+        avg_walkable = round(float(np.mean(walkable_scores)), 1) if walkable_scores else 95.0
+        avg_access = round(float(np.mean(access_scores)), 1) if access_scores else 90.0
+
+        if sampled_annotated:
+            gif_buf = io.BytesIO()
+            sampled_annotated[0].save(
+                gif_buf,
+                format="GIF",
+                save_all=True,
+                append_images=sampled_annotated[1:],
+                duration=400,
+                loop=0,
+                optimize=True,
+            )
+            preview_bytes = gif_buf.getvalue()
+        else:
+            preview_bytes = b""
+
+        return all_detections, preview_bytes, avg_walkable, avg_access, width, height
+
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
