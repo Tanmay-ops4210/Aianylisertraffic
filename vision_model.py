@@ -141,7 +141,7 @@ def draw_annotations(image: Image.Image, detections: list[dict[str, Any]]) -> by
 def run_detection(
     image: Image.Image,
     conf_threshold: float = 0.30,
-    input_size: int = 416,
+    input_size: int = 640,
 ) -> tuple[list[dict[str, Any]], bytes, float, float]:
     """Run YOLOv8 inference, return detections, annotated preview, walkable %, and score."""
     session = get_session()
@@ -255,11 +255,9 @@ def process_video(
             if curr_frame_idx in target_set:
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 pil_frame = Image.fromarray(rgb)
-                # Shrink frame to 320px for fast inference on low-CPU
-                pil_frame.thumbnail((320, 320))
                 time_sec = round(curr_frame_idx / fps, 1)
 
-                dets, _, w_pct, a_score = run_detection(pil_frame, conf_threshold=0.30)
+                dets, _, w_pct, a_score = run_detection(pil_frame, conf_threshold=0.30, input_size=640)
                 walkable_scores.append(w_pct)
                 access_scores.append(a_score)
 

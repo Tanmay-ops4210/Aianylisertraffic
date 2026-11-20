@@ -249,31 +249,34 @@ async def analyze(image: Annotated[UploadFile, File()]) -> AnalysisResponse:
     decoded, summary = decode_image(data, image.filename)
 
     if is_model_available():
-        detections, preview, walkable_pct, access_score = await asyncio.to_thread(run_detection, decoded)
-        det_count = len(detections)
-        limitations = [
-            f"Detected {det_count} sidewalk obstacle(s) using YOLOv8-nano."
-            if det_count > 0 else "No major physical obstacles detected on the path.",
-            "Walkable space and accessibility scores are preliminary estimates.",
-            "This preliminary research tool is not accessibility certification or proof of wheelchair safety.",
-        ]
-        return AnalysisResponse(
-            status="complete",
-            image=summary,
-            model_configured=True,
-            detections_available=True,
-            detections=detections,
-            sidewalk_mask_available=False,
-            obstacle_masks_available=det_count > 0,
-            walkable_percentage=walkable_pct,
-            accessibility_score=access_score,
-            walkable_estimate_status="calculated",
-            processed_image_available=True,
-            processed_preview_base64=base64.b64encode(preview).decode("ascii"),
-            processing_method="yolov8n_obstacle_detection",
-            processing_ms=round((time.perf_counter() - started) * 1000, 2),
-            limitations=limitations,
-        )
+        try:
+            detections, preview, walkable_pct, access_score = await asyncio.to_thread(run_detection, decoded)
+            det_count = len(detections)
+            limitations = [
+                f"Detected {det_count} sidewalk obstacle(s) using YOLOv8-nano."
+                if det_count > 0 else "No major physical obstacles detected on the path.",
+                "Walkable space and accessibility scores are preliminary estimates.",
+                "This preliminary research tool is not accessibility certification or proof of wheelchair safety.",
+            ]
+            return AnalysisResponse(
+                status="complete",
+                image=summary,
+                model_configured=True,
+                detections_available=True,
+                detections=detections,
+                sidewalk_mask_available=False,
+                obstacle_masks_available=det_count > 0,
+                walkable_percentage=walkable_pct,
+                accessibility_score=access_score,
+                walkable_estimate_status="calculated",
+                processed_image_available=True,
+                processed_preview_base64=base64.b64encode(preview).decode("ascii"),
+                processing_method="yolov8n_obstacle_detection",
+                processing_ms=round((time.perf_counter() - started) * 1000, 2),
+                limitations=limitations,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Failed to analyze image: {exc}")
 
     preview = make_edge_preview(decoded)
     return AnalysisResponse(

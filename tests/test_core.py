@@ -97,5 +97,18 @@ class EvaluationTests(unittest.TestCase):
         self.assertIn("obstacle_detection", evaluate(examples))
 
 
+class ModelInferenceTests(unittest.TestCase):
+    def test_detection_runs_without_dimension_error(self):
+        from vision_model import is_model_available, run_detection
+        if not is_model_available():
+            self.skipTest("ONNX model or runtime not available")
+        img = Image.new("RGB", (320, 240), color="white")
+        dets, preview, w_pct, score = run_detection(img)
+        self.assertIsInstance(dets, list)
+        self.assertTrue(preview.startswith(b"\xff\xd8"))  # JPEG header
+        self.assertGreater(w_pct, 0)
+        self.assertGreater(score, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
