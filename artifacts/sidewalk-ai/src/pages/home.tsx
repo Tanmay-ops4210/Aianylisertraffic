@@ -5,6 +5,7 @@ import {
   Check,
   CircleHelp,
   FileImage,
+  FileText,
   Image as ImageIcon,
   Info,
   Map,
@@ -16,6 +17,8 @@ import {
 } from 'lucide-react';
 import { getSidewalkHealthQueryKey, useAnalyzeSidewalkImage, useSidewalkHealth } from '@workspace/api-client-react';
 import type { AnalysisResult } from '@workspace/api-client-react';
+import { AnalyticsDashboard } from '@/components/analytics-dashboard';
+import { openPdfReport } from '@/lib/pdf-report';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 const ACCEPTED_TYPES = [
@@ -365,11 +368,42 @@ export default function Home() {
           )}
 
           <ResultDetails result={result} />
+
+          {result && (
+            <AnalyticsDashboard
+              result={result}
+              isVideo={file?.type.startsWith('video/')}
+            />
+          )}
+
           <div className="report-bar">
-            <div className="report-copy"><strong>Research record</strong>{result ? 'Export the exact JSON response returned by the analysis service.' : 'A report becomes available after a successful image inspection.'}</div>
-            <button className="secondary-button" type="button" disabled={!result} onClick={downloadReport} data-testid="button-export-json">
-              <ArrowDownToLine size={14} /> Export JSON
-            </button>
+            <div className="report-copy">
+              <strong>Research Record & Audit Report</strong>
+              {result
+                ? 'Export the inspection data as raw JSON or generate a comprehensive PDF evaluation report with evidence overlays and diagnostics.'
+                : 'A report becomes available after a successful image inspection.'}
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={!result}
+                onClick={downloadReport}
+                data-testid="button-export-json"
+              >
+                <ArrowDownToLine size={14} /> Export JSON
+              </button>
+              <button
+                className="primary-button"
+                style={{ width: 'auto', minHeight: '36px', marginTop: 0, padding: '0 15px', background: '#24463c' }}
+                type="button"
+                disabled={!result}
+                onClick={() => result && openPdfReport(result, file?.type.startsWith('video/'))}
+                data-testid="button-export-pdf"
+              >
+                <FileText size={14} /> Download PDF Report
+              </button>
+            </div>
           </div>
         </section>
 
